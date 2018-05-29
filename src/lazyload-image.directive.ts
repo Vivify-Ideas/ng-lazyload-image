@@ -16,7 +16,6 @@ import {
 import { getScrollListener } from './scroll-listener';
 import { lazyLoadImage } from './lazyload-image';
 import { isWindowDefined } from './utils';
-import { DEFAULT_OFFSET, ZW_PLACEHOLDER_THUMB } from './constants';
 
 interface LazyLoadImageDirectiveProps {
     lazyImage: string;
@@ -103,6 +102,6 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
     }
 
     static setDefaultConfig(config) {
-        Object.assign(config, LazyLoadImageDirective._defaultConfig);
+        LazyLoadImageDirective._defaultConfig = Object.assign(config, LazyLoadImageDirective._defaultConfig);
     }
 }
