@@ -7,7 +7,6 @@ import {
   catchError,
 } from 'rxjs/operators';
 import { Observable } from 'rxjs/Observable';
-import { getScrollListener } from './scroll-listener';
 import { Rect } from './rect';
 import { cssClassNames } from './constants';
 import { hasCssClassName, removeCssClassName, addCssClassName } from './utils';

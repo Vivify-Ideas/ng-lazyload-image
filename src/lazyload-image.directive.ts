@@ -2,20 +2,23 @@ import { Observable } from 'rxjs/Observable';
 import { ReplaySubject } from 'rxjs/ReplaySubject';
 import { switchMap, debounceTime } from 'rxjs/operators';
 import {
-  AfterContentInit,
-  Directive,
-  ElementRef,
-  EventEmitter,
-  Input,
-  NgZone,
-  Output,
-  OnChanges,
-  OnDestroy,
-  SimpleChanges
+    AfterContentInit,
+    Directive,
+    ElementRef,
+    EventEmitter,
+    Input,
+    NgZone,
+    Output,
+    OnChanges,
+    OnDestroy,
+    SimpleChanges,
+    Renderer2,
+    Inject
 } from '@angular/core';
 import { getScrollListener } from './scroll-listener';
-import { lazyLoadImage } from './lazyload-image';
+import { isImageElement, lazyLoadImage } from './lazyload-image';
 import { isWindowDefined } from './utils';
+import { DOCUMENT } from "@angular/common";
 
 interface LazyLoadImageDirectiveProps {
     lazyImage: string;
@@ -32,11 +35,11 @@ interface LazyLoadImageDirectiveProps {
 })
 export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDestroy {
     @Input('lazyLoad') lazyImage;   // The image to be lazy loaded
-    @Input() defaultImage: string   // The image to be displayed before lazyImage is loaded
+    @Input() defaultImage: string;  // The image to be displayed before lazyImage is loaded
     @Input() errorImage: string;    // The image to be displayed if lazyImage load fails
     @Input() scrollTarget: any;     // Scroll container that contains the image and emits scoll events
     @Input() scrollObservable;      // Pass your own scroll emitter
-    @Input() offset: number         // The number of px a image should be loaded before it is in view port, defaults to 300
+    @Input() offset: number;        // The number of px a image should be loaded before it is in view port, defaults to 300
     @Input() useSrcset: boolean;    // Whether srcset attribute should be used instead of src
     @Output() onLoad: EventEmitter<boolean> = new EventEmitter(); // Callback when an image is loaded
     private propertyChanges$: ReplaySubject<LazyLoadImageDirectiveProps>;
@@ -45,8 +48,10 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
     private scrollSubscription;
 
     private static _defaultConfig = {};
+    private doc;
 
-    constructor(el: ElementRef, ngZone: NgZone) {
+    constructor(el: ElementRef, ngZone: NgZone, private renderer: Renderer2, @Inject(DOCUMENT) document) {
+        this.doc = document;
         this.elementRef = el;
         this.ngZone = ngZone;
         this.propertyChanges$ = new ReplaySubject();
@@ -65,9 +70,10 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
     }
 
     ngAfterContentInit() {
-        // Disable lazy load image in server side
+        let ssr = false;
+
         if (!isWindowDefined()) {
-            return null;
+            ssr = true;
         }
 
         this.ngZone.runOutsideAngular(() => {
@@ -78,30 +84,74 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
                 const windowTarget = isWindowDefined() ? window : undefined;
                 scrollObservable = getScrollListener(this.scrollTarget || windowTarget);
             }
-            this.scrollSubscription = this.propertyChanges$.pipe(
-                debounceTime(10),
-                switchMap(props => scrollObservable.pipe(
-                    lazyLoadImage(
-                        this.elementRef.nativeElement,
-                        props.lazyImage,
-                        props.defaultImage,
-                        props.errorImage,
-                        props.offset,
-                        props.useSrcset,
-                        props.scrollTarget
-                    )
-                ))
-            ).subscribe(success => this.onLoad.emit(success));
+
+            if (ssr) {
+                setTimeout(() => this.propertyChanges$.subscribe(
+                    (props) =>
+                        this.ssrLazyLoadImage(
+                            this.elementRef.nativeElement,
+                            props.lazyImage,
+                            props.defaultImage,
+                            props.useSrcset
+                        )
+                ), 100);
+
+            } else {
+                this.scrollSubscription = this.propertyChanges$.pipe(
+                    debounceTime(10),
+                    switchMap(props => scrollObservable.pipe(
+                        lazyLoadImage(
+                            this.elementRef.nativeElement,
+                            props.lazyImage,
+                            props.defaultImage,
+                            props.errorImage,
+                            props.offset,
+                            props.useSrcset,
+                            props.scrollTarget,
+                        )
+                    ))
+                ).subscribe(success => this.onLoad.emit(success));
+            }
+
         });
+    }
+
+    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false) {
+        this.renderer.setAttribute(element, 'src', defaultImagePath);
+
+        let first_N_Images = Array.from(this.doc.body.getElementsByTagName('img')).slice(2, 20);
+
+        if (this.isInFirst_N_Images(first_N_Images, element)) {
+            this.setImage(element, imagePath, useSrcset);
+        }
+    }
+
+    setImage(element: HTMLImageElement | HTMLDivElement, imagePath: string, useSrcset: boolean) {
+        if (isImageElement(element)) {
+            if (useSrcset) {
+                element.srcset = imagePath;
+            } else {
+                element.src = imagePath;
+            }
+        } else {
+            element.style.backgroundImage = `url('${imagePath}')`;
+        }
+        return element;
+    }
+
+    isInFirst_N_Images(first_N_Images, element) {
+        return first_N_Images.find((img:HTMLImageElement) => {
+            return img == element;
+        });
+    }
+
+    static setDefaultConfig(config) {
+        LazyLoadImageDirective._defaultConfig = Object.assign(config, LazyLoadImageDirective._defaultConfig);
     }
 
     ngOnDestroy() {
         [this.scrollSubscription]
             .filter(subscription => subscription && !subscription.isUnsubscribed)
             .forEach(subscription => subscription.unsubscribe());
-    }
-
-    static setDefaultConfig(config) {
-        LazyLoadImageDirective._defaultConfig = Object.assign(config, LazyLoadImageDirective._defaultConfig);
     }
 }
