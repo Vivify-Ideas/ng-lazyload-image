@@ -29,19 +29,21 @@ interface LazyLoadImageDirectiveProps {
     scrollObservable: Observable<Event>;
     offset: number;
     useSrcset: boolean;
+    ssrImageLimitCount: number;
 }
 
 @Directive({
     selector: '[lazyLoad]'
 })
 export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDestroy {
-    @Input('lazyLoad') lazyImage;   // The image to be lazy loaded
-    @Input() defaultImage: string;  // The image to be displayed before lazyImage is loaded
-    @Input() errorImage: string;    // The image to be displayed if lazyImage load fails
-    @Input() scrollTarget: any;     // Scroll container that contains the image and emits scoll events
-    @Input() scrollObservable;      // Pass your own scroll emitter
-    @Input() offset: number;        // The number of px a image should be loaded before it is in view port, defaults to 300
-    @Input() useSrcset: boolean;    // Whether srcset attribute should be used instead of src
+    @Input('lazyLoad') lazyImage;           // The image to be lazy loaded
+    @Input() defaultImage: string;          // The image to be displayed before lazyImage is loaded
+    @Input() errorImage: string;            // The image to be displayed if lazyImage load fails
+    @Input() scrollTarget: any;             // Scroll container that contains the image and emits scoll events
+    @Input() scrollObservable;              // Pass your own scroll emitter
+    @Input() offset: number;                // The number of px a image should be loaded before it is in view port, defaults to 300
+    @Input() useSrcset: boolean;            // Whether srcset attribute should be used instead of src
+    @Input() ssrImageLimitCount: number;    // number of images to lazy load in ssr mode
     @Output() onLoad: EventEmitter<boolean> = new EventEmitter(); // Callback when an image is loaded
     private propertyChanges$: ReplaySubject<LazyLoadImageDirectiveProps>;
     private elementRef: ElementRef;
@@ -67,7 +69,8 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
             scrollTarget: this.scrollTarget ? this.scrollTarget : LazyLoadImageDirective._defaultConfig['scrollTarget'],
             scrollObservable: this.scrollObservable ? this.scrollObservable : LazyLoadImageDirective._defaultConfig['scrollObservable'],
             offset: this.offset ? this.offset : LazyLoadImageDirective._defaultConfig['offset'] | 0,
-            useSrcset: this.useSrcset ? this.useSrcset : LazyLoadImageDirective._defaultConfig['useSrcset']
+            useSrcset: this.useSrcset ? this.useSrcset : LazyLoadImageDirective._defaultConfig['useSrcset'],
+            ssrImageLimitCount: this.ssrImageLimitCount ? this.ssrImageLimitCount : LazyLoadImageDirective._defaultConfig['ssrImageLimitCount'] | 0
         });
     }
 
@@ -94,7 +97,8 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
                             this.elementRef.nativeElement,
                             props.lazyImage,
                             props.defaultImage,
-                            props.useSrcset
+                            props.useSrcset,
+                            props.ssrImageLimitCount
                         )
                 ), 100);
 
@@ -118,12 +122,12 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
         });
     }
 
-    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false) {
+    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false, ssrImageLimitCount) {
         this.renderer.setAttribute(element, 'src', defaultImagePath);
 
-        let first_N_Images = Array.from(this.doc.body.getElementsByClassName(cssClassNames.applied)).slice(0, 20);
+        let firstNImages = Array.from(this.doc.body.getElementsByClassName(cssClassNames.applied)).slice(0, ssrImageLimitCount);
 
-        if (this.isInFirst_N_Images(first_N_Images, element)) {
+        if (this.isInFirstNImages(firstNImages, element)) {
             this.setImage(element, imagePath, useSrcset);
         }
     }
@@ -141,8 +145,8 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
         return element;
     }
 
-    isInFirst_N_Images(first_N_Images, element) {
-        return first_N_Images.find((img:HTMLImageElement) => {
+    isInFirstNImages(firstNImages, element) {
+        return firstNImages.find((img:HTMLImageElement) => {
             return img == element;
         });
     }
