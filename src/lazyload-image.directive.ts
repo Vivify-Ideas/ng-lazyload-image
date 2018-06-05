@@ -15,10 +15,11 @@ import {
     Renderer2,
     Inject
 } from '@angular/core';
+import { DOCUMENT } from '@angular/common';
 import { getScrollListener } from './scroll-listener';
 import { isImageElement, lazyLoadImage } from './lazyload-image';
 import { isWindowDefined } from './utils';
-import { DOCUMENT } from "@angular/common";
+import { cssClassNames } from './constants';
 
 interface LazyLoadImageDirectiveProps {
     lazyImage: string;
@@ -55,6 +56,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
         this.elementRef = el;
         this.ngZone = ngZone;
         this.propertyChanges$ = new ReplaySubject();
+        this.renderer.addClass(el.nativeElement, cssClassNames.applied);
     }
 
     ngOnChanges(changes?: SimpleChanges) {
@@ -119,7 +121,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
     ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false) {
         this.renderer.setAttribute(element, 'src', defaultImagePath);
 
-        let first_N_Images = Array.from(this.doc.body.getElementsByTagName('img')).slice(2, 20);
+        let first_N_Images = Array.from(this.doc.body.getElementsByClassName(cssClassNames.applied)).slice(0, 20);
 
         if (this.isInFirst_N_Images(first_N_Images, element)) {
             this.setImage(element, imagePath, useSrcset);
