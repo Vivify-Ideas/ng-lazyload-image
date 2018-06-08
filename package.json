@@ -2,7 +2,7 @@
   "name": "ng-lazyload-image",
   "version": "3.4.2",
   "description": "Lazy image loader for Angular > v2",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "prepare": "npm run build",
     "test": "karma start karma.local.js",
