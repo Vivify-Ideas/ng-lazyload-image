@@ -30,6 +30,7 @@ interface LazyLoadImageDirectiveProps {
     offset: number;
     useSrcset: boolean;
     ssrImageLimitCount: number;
+    useNoScript: boolean;
 }
 
 @Directive({
@@ -44,6 +45,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
     @Input() offset: number;                // The number of px a image should be loaded before it is in view port, defaults to 300
     @Input() useSrcset: boolean;            // Whether srcset attribute should be used instead of src
     @Input() ssrImageLimitCount: number;    // number of images to lazy load in ssr mode
+    @Input() useNoScript: boolean;          // whether to add <noscript> + <img> tag on ssr for SEO
     @Output() onLoad: EventEmitter<boolean> = new EventEmitter(); // Callback when an image is loaded
     private propertyChanges$: ReplaySubject<LazyLoadImageDirectiveProps>;
     private elementRef: ElementRef;
@@ -70,7 +72,8 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
             scrollObservable: this.scrollObservable ? this.scrollObservable : LazyLoadImageDirective._defaultConfig['scrollObservable'],
             offset: this.offset ? this.offset : LazyLoadImageDirective._defaultConfig['offset'] | 0,
             useSrcset: this.useSrcset ? this.useSrcset : LazyLoadImageDirective._defaultConfig['useSrcset'],
-            ssrImageLimitCount: this.ssrImageLimitCount ? this.ssrImageLimitCount : LazyLoadImageDirective._defaultConfig['ssrImageLimitCount'] | 0
+            ssrImageLimitCount: this.ssrImageLimitCount ? this.ssrImageLimitCount : LazyLoadImageDirective._defaultConfig['ssrImageLimitCount'] | 0,
+            useNoScript: this.useNoScript ? this.useNoScript : LazyLoadImageDirective._defaultConfig['useNoScript']
         });
     }
 
@@ -98,7 +101,8 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
                             props.lazyImage,
                             props.defaultImage,
                             props.useSrcset,
-                            props.ssrImageLimitCount
+                            props.ssrImageLimitCount,
+                            props.useNoScript
                         )
                 ), 100);
 
@@ -122,13 +126,17 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
         });
     }
 
-    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false, ssrImageLimitCount) {
+    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false, ssrImageLimitCount, useNoScript) {
         this.renderer.setAttribute(element, 'src', defaultImagePath);
 
         let firstNImages = Array.from(this.doc.body.getElementsByClassName(cssClassNames.applied)).slice(0, ssrImageLimitCount);
 
         if (this.isInFirstNImages(firstNImages, element)) {
             this.setImage(element, imagePath, useSrcset);
+        } else {
+            if (useNoScript) {
+                this.addNoScriptTag(imagePath);
+            }
         }
     }
 
@@ -143,6 +151,15 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
             element.style.backgroundImage = `url('${imagePath}')`;
         }
         return element;
+    }
+
+    addNoScriptTag(imagePath) {
+        let img = this.renderer.createElement('img');
+        this.renderer.setAttribute(img, 'src', imagePath);
+        let noScript = this.renderer.createElement('noscript');
+        this.renderer.appendChild(noScript, img);
+
+        this.renderer.insertBefore(this.renderer.parentNode(this.elementRef.nativeElement), noScript, this.elementRef.nativeElement);
     }
 
     isInFirstNImages(firstNImages, element) {
