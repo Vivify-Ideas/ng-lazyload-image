@@ -31,7 +31,6 @@ interface LazyLoadImageDirectiveProps {
     useSrcset: boolean;
     ssrImageLimitCount: number;
     useNoScript: boolean;
-    description: string;
 }
 
 @Directive({
@@ -75,8 +74,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
             offset: this.offset ? this.offset : LazyLoadImageDirective._defaultConfig['offset'] | 0,
             useSrcset: this.useSrcset ? this.useSrcset : LazyLoadImageDirective._defaultConfig['useSrcset'],
             ssrImageLimitCount: this.ssrImageLimitCount ? this.ssrImageLimitCount : LazyLoadImageDirective._defaultConfig['ssrImageLimitCount'] | 0,
-            useNoScript: this.useNoScript ? this.useNoScript : LazyLoadImageDirective._defaultConfig['useNoScript'],
-            description: this.description ? this.description : LazyLoadImageDirective._defaultConfig['description']
+            useNoScript: this.useNoScript ? this.useNoScript : LazyLoadImageDirective._defaultConfig['useNoScript']
         });
     }
 
@@ -105,8 +103,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
                             props.defaultImage,
                             props.useSrcset,
                             props.ssrImageLimitCount,
-                            props.useNoScript,
-                            props.description
+                            props.useNoScript
                         )
                 ), 100);
 
@@ -130,7 +127,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
         });
     }
 
-    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false, ssrImageLimitCount, useNoScript, imageDescription) {
+    ssrLazyLoadImage(element: any, imagePath: string, defaultImagePath: string, useSrcset: boolean = false, ssrImageLimitCount, useNoScript) {
         this.renderer.setAttribute(element, 'src', defaultImagePath);
 
         let firstNImages = Array.from(this.doc.body.getElementsByClassName(cssClassNames.applied)).slice(0, ssrImageLimitCount);
@@ -139,7 +136,7 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
             this.setImage(element, imagePath, useSrcset);
         } else {
             if (useNoScript) {
-                this.addNoScriptTag(imagePath, imageDescription);
+                this.addNoScriptTag(imagePath, element);
             }
         }
     }
@@ -157,11 +154,11 @@ export class LazyLoadImageDirective implements OnChanges, AfterContentInit, OnDe
         return element;
     }
 
-    addNoScriptTag(imagePath, imageDescription) {
+    addNoScriptTag(imagePath, element) {
         let img = this.renderer.createElement('img');
         this.renderer.setAttribute(img, 'src', imagePath);
-        this.renderer.setAttribute(img, 'alt', imageDescription);
-        this.renderer.setAttribute(img, 'title', imageDescription);
+        this.renderer.setAttribute(img, 'alt', element.alt);
+        this.renderer.setAttribute(img, 'title', element.title);
         let noScript = this.renderer.createElement('noscript');
         this.renderer.appendChild(noScript, img);
 
